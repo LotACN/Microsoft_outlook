@@ -1,13 +1,1226 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>microsoft-outlook</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outlook Arena — Live Multiplayer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100vh;background:#0f0f1a}
+body{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:#e8e8ff}
+:root{
+  --p:#A100FF;--pd:#6d00b3;--pl:#c94fff;--pg:rgba(161,0,255,.14);
+  --bg:#0f0f1a;--card:#181830;--card2:#1e1e3a;--border:rgba(161,0,255,.2);
+  --muted:#7a7aaa;--text:#e8e8ff;
+  --ok:#00d4aa;--warn:#ffb800;--err:#ff4466;
+  --g1:#A100FF;--g2:#0078D4;--g3:#107C10;--g4:#CA5010;--g5:#8764B8;
+}
+
+/* ── layout ── */
+#app{min-height:100vh;display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+.page{display:none;flex-direction:column;min-height:100vh;padding:20px;gap:16px;position:relative;z-index:1}
+.page.on{display:flex}
+
+/* decorative blobs */
+.blob{position:fixed;border-radius:50%;pointer-events:none;z-index:0}
+.b1{width:500px;height:500px;background:radial-gradient(circle,rgba(161,0,255,.09) 0%,transparent 70%);top:-120px;right:-120px}
+.b2{width:320px;height:320px;background:radial-gradient(circle,rgba(0,120,212,.08) 0%,transparent 70%);bottom:-60px;left:-60px}
+
+/* ── typography ── */
+.title-xl{font-size:clamp(28px,6vw,52px);font-weight:900;letter-spacing:-.04em;line-height:1.05}
+.title-lg{font-size:clamp(20px,4vw,32px);font-weight:800;letter-spacing:-.02em}
+.title-md{font-size:18px;font-weight:700}
+.label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+/* ── buttons ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;transition:all .15s;letter-spacing:.02em;white-space:nowrap}
+.btn-p{background:linear-gradient(135deg,var(--p),var(--pd));color:#fff;padding:11px 24px;box-shadow:0 4px 20px rgba(161,0,255,.35)}
+.btn-p:hover{transform:translateY(-1px);box-shadow:0 6px 28px rgba(161,0,255,.5)}
+.btn-p:active{transform:translateY(0)}
+.btn-o{background:transparent;border:1.5px solid var(--muted);color:var(--muted);padding:10px 20px}
+.btn-o:hover{border-color:var(--text);color:var(--text);background:rgba(255,255,255,.04)}
+.btn-sm{font-size:12px;padding:7px 14px;border-radius:8px}
+.btn-danger{background:rgba(255,68,102,.15);border:1px solid rgba(255,68,102,.4);color:var(--err);padding:6px 12px;font-size:11px;border-radius:8px;cursor:pointer}
+.btn-danger:hover{background:rgba(255,68,102,.25)}
+.btn-ok{background:rgba(0,212,170,.15);border:1px solid rgba(0,212,170,.4);color:var(--ok);padding:6px 12px;font-size:11px;border-radius:8px;cursor:pointer;font-weight:700}
+.btn-ok:hover{background:rgba(0,212,170,.25)}
+
+/* ── cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 20px}
+.card2{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:14px 18px}
+.raised{background:var(--card);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:20px 24px}
+
+/* ── inputs ── */
+.inp{background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.14);border-radius:10px;color:var(--text);font-size:14px;padding:11px 14px;outline:none;transition:border .2s;width:100%}
+.inp:focus{border-color:var(--p)}
+.inp::placeholder{color:var(--muted)}
+
+/* ── pills ── */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.04em}
+
+/* ── grid ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.flex{display:flex;align-items:center;gap:10px}
+.flex-col{display:flex;flex-direction:column;gap:10px}
+.between{justify-content:space-between}
+.wrap{flex-wrap:wrap}
+
+/* ── animations ── */
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes grow{from{width:0}to{width:100%}}
+@keyframes pop{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+@keyframes olpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,120,212,.5)}50%{box-shadow:0 0 0 5px rgba(0,120,212,0)}}
+.fade-in{animation:fadein .3s ease}
+.spin{animation:spin 1s linear infinite}
+.pop{animation:pop .35s cubic-bezier(.34,1.56,.64,1) forwards}
+
+/* ── avatar ── */
+.av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;color:#fff}
+
+/* ── status dot ── */
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-ok{background:var(--ok)}
+.dot-warn{background:var(--warn)}
+.dot-off{background:var(--muted)}
+
+/* ── progress bar ── */
+.pbar-bg{background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:4px;transition:width .5s ease}
+
+/* ── loading spinner ── */
+.spinner{width:36px;height:36px;border:3px solid rgba(161,0,255,.2);border-top-color:var(--p);border-radius:50%;animation:spin .8s linear infinite}
+
+/* ── toast ── */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 22px;border-radius:30px;font-size:13px;font-weight:700;color:#fff;z-index:9999;display:none;white-space:nowrap;animation:fadein .3s ease}
+#toast.show{display:block}
+
+/* ── overlay ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:900;display:none;align-items:center;justify-content:center;padding:20px}
+.overlay.show{display:flex}
+.modal{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:32px;max-width:420px;width:100%;animation:pop .35s cubic-bezier(.34,1.56,.64,1)}
+
+/* ══════════════════════════════════════
+   JOIN PAGE
+══════════════════════════════════════ */
+#join{align-items:center;justify-content:center;text-align:center;gap:24px}
+.join-logo{display:flex;gap:4px;justify-content:center}
+.join-logo span{width:18px;height:18px;border-radius:3px;display:block}
+.join-form{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px 32px;max-width:380px;width:100%;display:flex;flex-direction:column;gap:14px}
+.join-avatar-picker{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.av-opt{width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;border:2px solid transparent;transition:all .15s}
+.av-opt.sel{border-color:#fff;transform:scale(1.15)}
+
+/* ══════════════════════════════════════
+   WAITING PAGE
+══════════════════════════════════════ */
+#waiting{align-items:center;justify-content:center;gap:20px}
+.wait-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px 40px;max-width:440px;width:100%;text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px}
+.pulse-ring{width:80px;height:80px;border-radius:50%;border:3px solid var(--p);animation:pulse 2s ease infinite;display:flex;align-items:center;justify-content:center;font-size:32px}
+
+/* ══════════════════════════════════════
+   GAME PAGE
+══════════════════════════════════════ */
+#game .topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#game .g-title{flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.timer-chip{border-radius:12px;padding:8px 16px;text-align:center;min-width:90px;transition:background .5s}
+.timer-chip .lbl{font-size:9px;color:rgba(255,255,255,.65);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.timer-chip .val{font-size:23px;font-weight:900;color:#fff;letter-spacing:.08em;font-variant-numeric:tabular-nums}
+.score-chip{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:8px 16px;text-align:center}
+.score-chip .lbl{font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.score-chip .val{font-size:23px;font-weight:900;color:var(--warn)}
+.game-layout{display:grid;grid-template-columns:215px 1fr;gap:14px;align-items:start}
+
+/* task panel */
+.tp{background:var(--card);border-radius:14px;padding:13px;display:flex;flex-direction:column;gap:10px}
+.tp-title{font-size:12px;font-weight:700}
+.tp-desc{font-size:10px;color:var(--muted);line-height:1.6;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.tp-steps{display:flex;flex-direction:column;gap:5px}
+.tp-step{display:flex;align-items:flex-start;gap:7px;padding:8px 9px;border-radius:8px;cursor:pointer;transition:all .2s;border:1px solid transparent}
+.tp-step:hover{filter:brightness(1.1)}
+.step-num{width:19px;height:19px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;margin-top:1px;border:2px solid;transition:all .3s}
+.tp-footer{border-top:1px solid var(--border);padding-top:8px}
+
+/* team strip */
+.team-strip{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ── Outlook sim ── */
+.ol-win{background:#f3f2f1;border-radius:10px;overflow:hidden;border:1px solid #d2d0ce;font-size:12px;color:#323130}
+.ol-tb{background:#0078D4;color:#fff;padding:5px 10px;display:flex;align-items:center;gap:7px;font-size:12px}
+.ol-wb{background:rgba(255,255,255,.15);border:none;color:#fff;font-size:11px;cursor:pointer;padding:1px 6px;border-radius:2px}
+.ol-tabs{display:flex;background:#f3f2f1;border-bottom:1px solid #d2d0ce}
+.ol-t{padding:6px 13px;background:none;border:none;border-bottom:2px solid transparent;color:#555;cursor:pointer;font-size:11px;transition:all .15s}
+.ol-t.on{color:#0078D4;border-bottom-color:#0078D4;font-weight:700}
+.ol-rib{background:#f3f2f1;padding:5px 9px;border-bottom:1px solid #d2d0ce;display:flex;gap:6px;flex-wrap:wrap;min-height:36px;align-items:center}
+.ol-rb{padding:4px 10px;background:#fff;border:1px solid #d2d0ce;border-radius:3px;font-size:11px;cursor:pointer;color:#444;transition:all .15s}
+.ol-rb:hover,.ol-rb.hl:hover{background:#deecf9;border-color:#0078D4;color:#0078D4}
+.ol-rb.hl{background:#deecf9;border-color:#0078D4;color:#0078D4;animation:olpulse 1.5s infinite}
+.ol-body{display:flex;min-height:195px}
+.ol-sb{width:126px;background:#f3f2f1;border-right:1px solid #d2d0ce;padding:5px 0;flex-shrink:0}
+.ol-fi{padding:5px 9px;font-size:10px;cursor:pointer;color:#444}
+.ol-fi:hover{background:#edebe9}
+.ol-fi.on{background:#deecf9;color:#0078D4}
+.ol-main{flex:1;padding:10px;overflow:auto;max-height:290px}
+.ol-inp{width:100%;padding:5px 9px;background:#fff;border:1px solid #d2d0ce;border-radius:3px;font-size:11px;color:#323130;box-sizing:border-box;outline:none}
+.ol-inp:focus{border-color:#0078D4}
+.ol-bb{padding:5px 12px;background:#0078D4;border:none;border-radius:3px;color:#fff;font-size:11px;cursor:pointer}
+.ol-bs{padding:4px 10px;background:#fff;border:1px solid #d2d0ce;border-radius:3px;font-size:11px;cursor:pointer;color:#444}
+.ol-bs:hover{background:#deecf9;border-color:#0078D4;color:#0078D4}
+.c-row{display:flex;align-items:center;gap:5px}
+.c-lbl{width:30px;font-size:10px;color:#666;flex-shrink:0}
+.sync-ov{text-align:center;padding:22px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.inbox-row{padding:7px 10px;border-bottom:1px solid #edebe9;font-size:10px;cursor:pointer;color:#444}
+.inbox-row.unread{font-weight:700;color:#000}
+
+/* ══════════════════════════════════════
+   ADMIN PAGE
+══════════════════════════════════════ */
+#admin .adm-hdr{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.adm-stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 14px}
+.adm-stat .lbl{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.adm-stat .val{font-size:28px;font-weight:900}
+.player-row{display:grid;grid-template-columns:32px 1fr auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.player-row:last-child{border-bottom:none}
+.group-assign-btn{padding:4px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid;transition:all .15s}
+.group-section{border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.group-section-hdr{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.group-member-list{padding:10px 16px;display:flex;flex-direction:column;gap:6px;min-height:44px}
+.gm-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+.kick-btn{margin-left:auto;padding:3px 9px;border-radius:6px;font-size:10px;cursor:pointer;background:rgba(255,68,102,.1);border:1px solid rgba(255,68,102,.3);color:var(--err)}
+.kick-btn:hover{background:rgba(255,68,102,.2)}
+
+/* ══════════════════════════════════════
+   RESULTS PAGE
+══════════════════════════════════════ */
+#results{align-items:center;gap:18px;padding-top:28px;padding-bottom:28px}
+.lb-row{background:var(--card);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.07);width:100%;max-width:480px}
+.lb-row.gold{border-color:rgba(255,184,0,.45)}
+
+/* badge overlay */
+#badge-ov{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9000;display:none;align-items:center;justify-content:center}
+#badge-ov.show{display:flex}
+.badge-box{background:var(--card);border:2px solid var(--p);border-radius:22px;padding:40px 54px;text-align:center;animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
+
+/* ── responsive ── */
+@media(max-width:640px){
+  .game-layout{grid-template-columns:1fr}
+  .grid-4{grid-template-columns:repeat(2,1fr)}
+  .grid-2{grid-template-columns:1fr}
+  .join-form{padding:20px}
+}
+</style>
+</head>
+<body>
+<div class="blob b1"></div>
+<div class="blob b2"></div>
+<div id="app">
+
+<!-- ══ JOIN ══ -->
+<div class="page on" id="join">
+  <div class="join-logo">
+    <span style="background:#F25022"></span><span style="background:#7FBA00"></span>
+    <span style="background:#00A4EF"></span><span style="background:#FFB900"></span>
+  </div>
+  <div>
+    <div class="title-xl" style="text-align:center"><span style="color:var(--p)">Outlook</span> <span>Arena</span></div>
+    <div style="text-align:center;font-size:14px;color:var(--muted);margin-top:6px">MS Outlook Fundamentals · Live Multiplayer</div>
+  </div>
+  <div class="join-form">
+    <div class="title-md" style="text-align:center">Enter the game</div>
+    <div>
+      <div class="label" style="margin-bottom:7px">Pick an avatar</div>
+      <div class="join-avatar-picker" id="av-picker"></div>
+    </div>
+    <div>
+      <div class="label" style="margin-bottom:7px">Your name</div>
+      <input class="inp" id="name-inp" placeholder="e.g. Maria Santos" maxlength="30" onkeydown="if(event.key==='Enter')doJoin()"/>
+    </div>
+    <div id="join-err" style="color:var(--err);font-size:12px;display:none">Please enter your name first.</div>
+    <button class="btn btn-p" onclick="doJoin()" style="width:100%;padding:13px">Join Game 🎮</button>
+    <div style="text-align:center;font-size:11px;color:var(--muted)">Or <a href="#" onclick="openAdmin()" style="color:var(--p);text-decoration:none;font-weight:700">open as instructor / admin</a></div>
+  </div>
+</div>
+
+<!-- ══ WAITING ══ -->
+<div class="page" id="waiting">
+  <div class="wait-card">
+    <div class="pulse-ring" id="wait-icon">⏳</div>
+    <div class="title-md" id="wait-title">Waiting for the game to start…</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7" id="wait-sub">You've joined! The instructor will assign you to a group and launch the session.</div>
+    <div style="display:flex;align-items:center;gap:10px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;width:100%">
+      <div class="av" style="width:40px;height:40px;font-size:20px;background:var(--card)" id="wait-av"></div>
+      <div>
+        <div style="font-weight:700;font-size:14px" id="wait-name"></div>
+        <div style="font-size:11px;color:var(--muted)" id="wait-group-info">No group yet</div>
+      </div>
+      <div class="dot dot-ok" style="margin-left:auto" title="Connected"></div>
+    </div>
+    <div id="wait-players" style="width:100%"></div>
+  </div>
+</div>
+
+<!-- ══ GAME ══ -->
+<div class="page" id="game">
+  <div class="topbar">
+    <div class="g-title" id="g-title-row"></div>
+    <div class="timer-chip" id="timer-chip" style="background:var(--p)">
+      <div class="lbl">Time Left</div>
+      <div class="val" id="timer-val">20:00</div>
+    </div>
+    <div class="score-chip">
+      <div class="lbl">Score</div>
+      <div class="val" id="score-val">0</div>
+    </div>
+  </div>
+  <div class="game-layout">
+    <div class="tp" id="tp"></div>
+    <div style="display:flex;flex-direction:column;gap:9px">
+      <div class="ol-win" id="ol-win"></div>
+      <div class="card" style="padding:10px 14px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:8px">
+        💡 <strong style="color:var(--text)">Tip:</strong> Click steps in the task panel OR interact with the Outlook window above.
+        <button class="btn btn-o btn-sm" style="margin-left:auto" onclick="showResults()">Finish early →</button>
+      </div>
+      <div class="team-strip" id="team-strip"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN ══ -->
+<div class="page" id="admin">
+  <div class="adm-hdr">
+    <div>
+      <div class="title-lg"><span style="color:var(--p)">Admin</span> Dashboard</div>
+      <div style="font-size:11px;color:var(--muted)" id="adm-sub">MS Outlook Arena · Live session · <span id="adm-clock">--:--</span></div>
+    </div>
+    <div class="flex wrap" style="gap:8px">
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-size:12px">
+        🔗 Session: <strong style="color:var(--p)" id="session-code-disp">---</strong>
+      </div>
+      <button class="btn btn-o btn-sm" onclick="copyLink()">📋 Copy Link</button>
+      <button class="btn btn-p btn-sm" id="launch-btn" onclick="launchGame()" style="display:none">🚀 Launch Game</button>
+      <button class="btn btn-o btn-sm" id="end-btn" onclick="endGame()" style="display:none">⏹ End Game</button>
+    </div>
+  </div>
+
+  <!-- stats row -->
+  <div class="grid-4">
+    <div class="adm-stat"><div class="lbl">Players joined</div><div class="val" id="s-joined" style="color:var(--p)">0</div></div>
+    <div class="adm-stat"><div class="lbl">In groups</div><div class="val" id="s-grouped" style="color:var(--ok)">0</div></div>
+    <div class="adm-stat"><div class="lbl">Unassigned</div><div class="val" id="s-unassigned" style="color:var(--warn)">0</div></div>
+    <div class="adm-stat"><div class="lbl">Completed</div><div class="val" id="s-done" style="color:#0078D4">0</div></div>
+  </div>
+
+  <!-- unassigned players -->
+  <div class="card">
+    <div class="flex between" style="margin-bottom:12px">
+      <div class="title-md">Unassigned players</div>
+      <div style="font-size:11px;color:var(--muted)">Click a player to assign them to a group</div>
+    </div>
+    <div id="unassigned-list" style="display:flex;flex-direction:column;gap:4px;min-height:44px">
+      <div style="font-size:12px;color:var(--muted);font-style:italic;padding:8px 0">No unassigned players yet. Share the link so students can join!</div>
+    </div>
+  </div>
+
+  <!-- group sections -->
+  <div style="display:flex;flex-direction:column;gap:10px" id="group-sections"></div>
+
+  <!-- session log -->
+  <div class="card">
+    <div class="title-md" style="margin-bottom:10px">Live progress</div>
+    <div id="live-progress-table" style="display:flex;flex-direction:column;gap:3px"></div>
+  </div>
+</div>
+
+<!-- ══ RESULTS ══ -->
+<div class="page" id="results">
+  <div style="text-align:center">
+    <div style="font-size:52px;margin-bottom:10px">🏆</div>
+    <div class="title-xl"><span style="color:var(--p)">Challenge</span> <span>Complete!</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">MS Outlook Fundamentals · Final Results</div>
+  </div>
+  <div class="card2" id="my-result" style="max-width:300px;width:100%;text-align:center;border:2px solid var(--p)"></div>
+  <div style="font-weight:700;font-size:14px;color:var(--p);text-align:center">Group Leaderboard</div>
+  <div id="lb" style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:480px"></div>
+  <div class="card" style="max-width:480px;width:100%">
+    <div style="font-weight:700;font-size:13px;color:var(--p);margin-bottom:10px">Key skills practiced</div>
+    <div style="font-size:11px;line-height:2">✉️ Compose emails with To, Cc, and Bcc fields<br>⟳ Sync your mailbox with Send/Receive (F9)<br>✍️ Create a professional email signature<br>📂 Organise emails into custom folders<br>📅 Schedule meetings with Teams links</div>
+  </div>
+  <div class="flex wrap" style="gap:10px;justify-content:center">
+    <button class="btn btn-o" onclick="go('join');resetPlayer()">🔄 Rejoin</button>
+    <button class="btn btn-p" onclick="go('admin')">📊 Admin View</button>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<!-- assign modal -->
+<div class="overlay" id="assign-modal">
+  <div class="modal">
+    <div class="title-md" style="margin-bottom:6px">Assign to group</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:18px" id="assign-player-name"></div>
+    <div style="display:flex;flex-direction:column;gap:8px" id="assign-group-btns"></div>
+    <button class="btn btn-o btn-sm" style="margin-top:14px;width:100%" onclick="closeModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- badge overlay -->
+<div id="badge-ov">
+  <div class="badge-box">
+    <div style="font-size:56px;margin-bottom:12px" id="b-emoji">🎖</div>
+    <div style="font-size:22px;font-weight:800;color:var(--p);margin-bottom:7px">All tasks complete! 🎉</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px" id="b-group"></div>
+    <div style="font-size:34px;font-weight:900;color:var(--warn)" id="b-score"></div>
+    <button class="btn btn-p" style="margin-top:20px;padding:11px 32px" onclick="closeBadge()">View Results 🏆</button>
+  </div>
+</div>
+
+<!-- toast -->
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// STORAGE LAYER  (window.storage  — shared: true = global)
+// ════════════════════════════════════════════════════════════
+const STORE = {
+  async get(k){ try{const r=await window.storage.get(k,true);return r?JSON.parse(r.value):null;}catch{return null;} },
+  async set(k,v){ try{await window.storage.set(k,JSON.stringify(v),true);}catch(e){console.warn('store set',e);} },
+  async del(k){ try{await window.storage.delete(k,true);}catch{} },
+  async list(pfx){ try{const r=await window.storage.list(pfx,true);return r?.keys||[];}catch{return[];} }
+};
+
+// ════════════════════════════════════════════════════════════
+// CONSTANTS
+// ════════════════════════════════════════════════════════════
+const AVATARS=['🦊','🐯','🐻','🦁','🐸','🐧','🦄','🐺','🐼','🦋','🐙','🦅'];
+const COLORS=['#A100FF','#0078D4','#107C10','#CA5010','#8764B8'];
+const GROUPS=[
+  {id:1,name:'Compose Squad',emoji:'✉️',color:'#A100FF',light:'#C94FFF',badge:'📝',task:'Send a New Email',
+   desc:'Send a professional introduction email to your new team.',
+   steps:[
+    {id:'s1',label:'Click New Email button',hint:'Home tab → New Email'},
+    {id:'s2',label:'Add a To: recipient',hint:'Type an email address with @'},
+    {id:'s3',label:'Add a Cc: recipient',hint:'Click Cc field, add address'},
+    {id:'s4',label:'Write a subject line',hint:'Keep it short and clear'},
+    {id:'s5',label:'Write the message body',hint:'At least 2 sentences'},
+    {id:'s6',label:'Click Send',hint:'Blue Send button in compose'},
+   ]},
+  {id:2,name:'Sync Masters',emoji:'🔄',color:'#0078D4',light:'#40A9FF',badge:'⚡',task:'Send/Receive & Sync',
+   desc:'Manually sync your mailbox and confirm new mail arrives.',
+   steps:[
+    {id:'s1',label:'Open the Send/Receive tab',hint:'Click tab in the ribbon'},
+    {id:'s2',label:'Click Send/Receive All Folders',hint:'Big button — or press F9'},
+    {id:'s3',label:'Watch the sync progress',hint:'Status bar updates'},
+    {id:'s4',label:'Check inbox for new messages',hint:'New items at the top'},
+    {id:'s5',label:'Use Update Folder on Inbox',hint:'Button in ribbon'},
+   ]},
+  {id:3,name:'Brand Builders',emoji:'✍️',color:'#107C10',light:'#40C040',badge:'🎨',task:'Email Signature',
+   desc:'Set up a professional email signature for all messages.',
+   steps:[
+    {id:'s1',label:'Click the File tab',hint:'Top-left of the ribbon'},
+    {id:'s2',label:'Go to Options → Mail',hint:'Left sidebar in File menu'},
+    {id:'s3',label:'Click Signatures…',hint:'In Compose Messages section'},
+    {id:'s4',label:'Create a new signature',hint:'Click New, give it a name'},
+    {id:'s5',label:'Format your signature',hint:'Name, title, company, phone'},
+    {id:'s6',label:'Assign to New messages',hint:'Dropdown at top-right'},
+    {id:'s7',label:'Click OK to save',hint:'Confirm and close'},
+   ]},
+  {id:4,name:'BCC Crew',emoji:'📂',color:'#CA5010',light:'#F08040',badge:'🗂️',task:'BCC & Folders',
+   desc:'Send a confidential BCC message and organise your inbox.',
+   steps:[
+    {id:'s1',label:'Open a New Email',hint:'Home → New Email'},
+    {id:'s2',label:'Show the Bcc field',hint:'Options tab → Bcc'},
+    {id:'s3',label:'Add a Bcc recipient',hint:'Hidden from others'},
+    {id:'s4',label:'Send the email',hint:'Click Send'},
+    {id:'s5',label:'Create a new folder',hint:'Right-click Inbox → New Folder'},
+    {id:'s6',label:'Move an email to folder',hint:'Drag or right-click → Move'},
+   ]},
+  {id:5,name:'Calendar Crew',emoji:'📅',color:'#8764B8',light:'#B090E0',badge:'🗓️',task:'Schedule & Meet',
+   desc:'Schedule a kickoff meeting with a Microsoft Teams link.',
+   steps:[
+    {id:'s1',label:'Switch to Calendar view',hint:'Calendar icon in sidebar'},
+    {id:'s2',label:'Create a new appointment',hint:'Double-click a time slot'},
+    {id:'s3',label:'Set title, date & location',hint:'Fill all required fields'},
+    {id:'s4',label:'Invite attendees',hint:'Click Invite Attendees'},
+    {id:'s5',label:'Add a Teams meeting link',hint:'Teams Meeting in ribbon'},
+    {id:'s6',label:'Save and send invites',hint:'Click Send / Save & Close'},
+   ]},
+];
+
+const TOTAL_SECS = 20*60;
+const ADMIN_PW   = 'admin123';     // change this to whatever you like
+const SESSION_KEY = 'oa_session';  // shared session state key
+const PLAYERS_PFX = 'oa_player_'; // per-player key prefix
+
+// ════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════
+let myId       = null; // this player's unique ID
+let myName     = null;
+let myAvatar   = null;
+let myGroupId  = null;
+let myScore    = 0;
+let mySteps    = {};   // {stepId: true}
+let isAdmin    = false;
+let gameActive = false;
+let timerLeft  = TOTAL_SECS;
+let timerIv    = null;
+let pollIv     = null;
+let syncIv     = null;
+let chosenAvIdx= 0;
+let sessionCode= null;
+
+let olState = freshOlState();
+function freshOlState(){
+  return {tab:'home',compose:false,syncing:false,syncDone:false,showBcc:false,
+    calView:false,meetingForm:false,mailOpts:false,sigDialog:false,sigSaved:false,
+    newFolder:false,toVal:'',ccVal:'',bccVal:'',subVal:'',bodyVal:'',
+    sigName:'',sigText:'',meetTitle:'',meetTeams:false,folders:[]};
+}
+
+// ════════════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════════════
+function pad(n){return String(n).padStart(2,'0');}
+function fmtTime(s){return pad(Math.floor(s/60))+':'+pad(s%60);}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function go(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  const el=document.getElementById(id);
+  if(el){el.classList.add('on');el.classList.add('fade-in');setTimeout(()=>el.classList.remove('fade-in'),400);}
+}
+function toast(msg,ok){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.style.background=ok?'var(--ok)':'var(--err)';
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);
+}
+function closeModal(){document.getElementById('assign-modal').classList.remove('show');}
+function closeBadge(){document.getElementById('badge-ov').classList.remove('show');showResults();}
+function copyLink(){
+  navigator.clipboard.writeText(location.href).then(()=>toast('Link copied to clipboard!',true));
+}
+function updateClock(){
+  const now=new Date();
+  const t=pad(now.getHours())+':'+pad(now.getMinutes());
+  const el=document.getElementById('adm-clock');if(el)el.textContent=t;
+}
+setInterval(updateClock,1000);updateClock();
+
+// ════════════════════════════════════════════════════════════
+// AVATAR PICKER
+// ════════════════════════════════════════════════════════════
+function buildAvatarPicker(){
+  const c=document.getElementById('av-picker');
+  c.innerHTML=AVATARS.map((a,i)=>`
+    <div class="av-opt${i===chosenAvIdx?' sel':''}" onclick="pickAv(${i})" title="${a}">${a}</div>
+  `).join('');
+}
+function pickAv(i){chosenAvIdx=i;myAvatar=AVATARS[i];buildAvatarPicker();}
+buildAvatarPicker();
+myAvatar=AVATARS[0];
+
+// ════════════════════════════════════════════════════════════
+// SESSION MANAGEMENT
+// ════════════════════════════════════════════════════════════
+async function getSession(){return await STORE.get(SESSION_KEY);}
+async function setSession(data){await STORE.set(SESSION_KEY,data);}
+
+async function getMyPlayer(){
+  if(!myId)return null;
+  return await STORE.get(PLAYERS_PFX+myId);
+}
+async function saveMyPlayer(extra={}){
+  if(!myId)return;
+  const g=GROUPS.find(gg=>gg.id===myGroupId);
+  const totalSteps=g?g.steps.length:0;
+  const doneSteps=Object.keys(mySteps).length;
+  await STORE.set(PLAYERS_PFX+myId,{
+    id:myId,name:myName,avatar:myAvatar,groupId:myGroupId,
+    score:myScore,stepsCompleted:doneSteps,totalSteps,
+    stepsMap:mySteps,lastSeen:Date.now(),...extra
+  });
+}
+
+async function getAllPlayers(){
+  const keys=await STORE.list(PLAYERS_PFX);
+  const players=[];
+  for(const k of keys){
+    const p=await STORE.get(k.replace(PLAYERS_PFX,'').replace('oa_player_',''));
+    // handle both key formats
+    const raw=await STORE.get(k.startsWith(PLAYERS_PFX)?k.slice(PLAYERS_PFX.length):k);
+    if(raw)players.push(raw);
+  }
+  // deduplicate
+  const seen=new Set();
+  const uniq=[];
+  for(const p of players){if(p&&p.id&&!seen.has(p.id)){seen.add(p.id);uniq.push(p);}}
+  return uniq;
+}
+
+// Better getAllPlayers using list prefix
+async function fetchAllPlayers(){
+  try{
+    const keys=await STORE.list('oa_player_');
+    const players=[];
+    for(const k of keys){
+      const p=await STORE.get(k);
+      if(p&&p.id)players.push(p);
+    }
+    return players;
+  }catch{return[];}
+}
+
+// ════════════════════════════════════════════════════════════
+// JOIN FLOW
+// ════════════════════════════════════════════════════════════
+async function doJoin(){
+  const nameEl=document.getElementById('name-inp');
+  const errEl=document.getElementById('join-err');
+  const name=nameEl.value.trim();
+  if(!name){errEl.style.display='block';nameEl.focus();return;}
+  errEl.style.display='none';
+
+  myId=uid();
+  myName=name;
+  myAvatar=AVATARS[chosenAvIdx];
+  myGroupId=null;myScore=0;mySteps={};
+
+  // ensure session exists
+  let sess=await getSession();
+  if(!sess){
+    // create a new session
+    sessionCode=Math.random().toString(36).slice(2,6).toUpperCase();
+    sess={code:sessionCode,status:'lobby',startedAt:null,timerLeft:TOTAL_SECS};
+    await setSession(sess);
+  } else {
+    sessionCode=sess.code;
+  }
+
+  await saveMyPlayer();
+  document.getElementById('session-code-disp').textContent=sessionCode;
+
+  // If game is already active, jump straight to game
+  if(sess.status==='active'){
+    // find my group from session if admin assigned
+    gameActive=true;
+    timerLeft=sess.timerLeft||TOTAL_SECS;
+    go('waiting');
+    startWaitPolling();
+    return;
+  }
+
+  go('waiting');
+  renderWaiting();
+  startWaitPolling();
+}
+
+function renderWaiting(){
+  document.getElementById('wait-av').textContent=myAvatar;
+  document.getElementById('wait-name').textContent=myName;
+  if(myGroupId){
+    const g=GROUPS.find(gg=>gg.id===myGroupId);
+    document.getElementById('wait-group-info').textContent=g?`Group: ${g.emoji} ${g.name}`:'Assigned!';
+  } else {
+    document.getElementById('wait-group-info').textContent='Waiting for group assignment…';
+  }
+}
+
+function startWaitPolling(){
+  if(pollIv)clearInterval(pollIv);
+  pollIv=setInterval(async()=>{
+    const sess=await getSession();
+    if(!sess)return;
+    sessionCode=sess.code;
+
+    // check if admin reassigned my group
+    const me=await STORE.get(myId);
+    if(me){
+      myGroupId=me.groupId;
+      myName=me.name||myName;
+    }
+    renderWaiting();
+    renderWaitingPlayers();
+
+    if(sess.status==='active'&&!gameActive){
+      clearInterval(pollIv);
+      gameActive=true;
+      timerLeft=sess.timerLeft||TOTAL_SECS;
+      startGame();
+    }
+    if(sess.status==='ended'){
+      clearInterval(pollIv);
+      showResults();
+    }
+  },2000);
+}
+
+async function renderWaitingPlayers(){
+  const players=await fetchAllPlayers();
+  const alive=players.filter(p=>Date.now()-p.lastSeen<30000);
+  const el=document.getElementById('wait-players');
+  if(!el)return;
+  el.innerHTML=`<div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">${alive.length} player${alive.length!==1?'s':''} in lobby</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px">
+    ${alive.map(p=>`<div style="display:flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:4px 10px 4px 7px;font-size:11px">
+      <span style="font-size:16px">${p.avatar}</span>${p.name.split(' ')[0]}
+    </div>`).join('')}
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// ADMIN FLOW
+// ════════════════════════════════════════════════════════════
+function openAdmin(){
+  const pw=prompt('Admin password:');
+  if(pw!==ADMIN_PW){alert('Wrong password.');return;}
+  isAdmin=true;
+  // ensure session
+  STORE.get(SESSION_KEY).then(async sess=>{
+    if(!sess){
+      sessionCode=Math.random().toString(36).slice(2,6).toUpperCase();
+      await STORE.set(SESSION_KEY,JSON.stringify({code:sessionCode,status:'lobby',startedAt:null,timerLeft:TOTAL_SECS}),true);
+    } else {
+      sessionCode=JSON.parse(sess.value||'{}').code||(await getSession())?.code;
+      const s=await getSession();
+      sessionCode=s?.code||'----';
+    }
+    document.getElementById('session-code-disp').textContent=sessionCode||'----';
+    go('admin');
+    startAdminPolling();
+  });
+}
+
+// simpler: just go straight
+async function goAdmin(){
+  const sess=await getSession()||{code:Math.random().toString(36).slice(2,6).toUpperCase(),status:'lobby',startedAt:null,timerLeft:TOTAL_SECS};
+  if(!sess.code){
+    sess.code=Math.random().toString(36).slice(2,6).toUpperCase();
+    await setSession(sess);
+  }
+  sessionCode=sess.code;
+  document.getElementById('session-code-disp').textContent=sessionCode;
+  go('admin');
+  startAdminPolling();
+}
+
+let adminPollIv=null;
+function startAdminPolling(){
+  if(adminPollIv)clearInterval(adminPollIv);
+  adminPollIv=setInterval(()=>renderAdmin(),2500);
+  renderAdmin();
+}
+
+async function renderAdmin(){
+  const players=await fetchAllPlayers();
+  const alive=players.filter(p=>Date.now()-p.lastSeen<25000);
+  const unassigned=alive.filter(p=>!p.groupId);
+  const assigned=alive.filter(p=>p.groupId);
+  const sess=await getSession();
+  const gameRunning=sess?.status==='active';
+
+  // stats
+  document.getElementById('s-joined').textContent=alive.length;
+  document.getElementById('s-grouped').textContent=assigned.length;
+  document.getElementById('s-unassigned').textContent=unassigned.length;
+  const done=alive.filter(p=>{const g=GROUPS.find(gg=>gg.id===p.groupId);return g&&p.stepsCompleted>=g.steps.length;}).length;
+  document.getElementById('s-done').textContent=done;
+
+  // launch / end button
+  document.getElementById('launch-btn').style.display=gameRunning?'none':'flex';
+  document.getElementById('end-btn').style.display=gameRunning?'flex':'none';
+
+  // unassigned
+  const ul=document.getElementById('unassigned-list');
+  if(unassigned.length===0){
+    ul.innerHTML=`<div style="font-size:12px;color:var(--muted);font-style:italic;padding:8px 0">${alive.length===0?'No players yet. Share the link!':'All players are assigned to groups.'}</div>`;
+  } else {
+    ul.innerHTML=unassigned.map(p=>`
+      <div class="player-row">
+        <div class="av" style="width:32px;height:32px;font-size:18px;background:var(--card2)">${p.avatar}</div>
+        <div>
+          <div style="font-size:13px;font-weight:600">${p.name}</div>
+          <div style="font-size:10px;color:var(--muted)">Joined · waiting</div>
+        </div>
+        <button class="btn btn-p btn-sm" onclick="openAssign('${p.id}','${p.name}')">Assign group →</button>
+      </div>`).join('');
+  }
+
+  // group sections
+  const gs=document.getElementById('group-sections');
+  gs.innerHTML=GROUPS.map(g=>{
+    const members=assigned.filter(p=>p.groupId===g.id);
+    const avgPct=members.length?Math.round(members.reduce((a,p)=>{
+      const tot=g.steps.length;return a+(p.stepsCompleted||0)/tot*100;},0)/members.length):0;
+    const gScore=members.reduce((a,p)=>a+(p.score||0),0);
+    return `<div class="group-section" style="border-color:${g.color}44">
+      <div class="group-section-hdr" style="background:${g.color}0d">
+        <div class="flex" style="gap:10px">
+          <span style="font-size:20px">${g.emoji}</span>
+          <div>
+            <div style="font-weight:700;font-size:13px">${g.name}</div>
+            <div style="font-size:11px;color:${g.color}">${g.task}</div>
+          </div>
+        </div>
+        <div class="flex" style="gap:14px">
+          <div style="text-align:right">
+            <div style="font-size:15px;font-weight:800;color:var(--warn)">${gScore} pts</div>
+            <div style="font-size:9px;color:var(--muted)">${members.length} member${members.length!==1?'s':''}</div>
+          </div>
+          <div style="width:60px">
+            <div class="pbar-bg" style="height:6px"><div class="pbar-fill" style="width:${avgPct}%;background:linear-gradient(90deg,${g.color},${g.light})"></div></div>
+            <div style="font-size:9px;color:var(--muted);text-align:right;margin-top:2px">${avgPct}%</div>
+          </div>
+        </div>
+      </div>
+      <div class="group-member-list">
+        ${members.length===0?`<div style="font-size:11px;color:var(--muted);font-style:italic">No members yet</div>`
+          :members.map(p=>{
+            const stepsPct=g.steps.length?Math.round((p.stepsCompleted||0)/g.steps.length*100):0;
+            return `<div class="gm-row">
+              <div class="av" style="width:26px;height:26px;font-size:14px;background:${g.color}22">${p.avatar}</div>
+              <div style="flex:1">
+                <div style="font-size:12px;font-weight:600">${p.name}</div>
+                <div class="pbar-bg" style="height:4px;margin-top:3px"><div class="pbar-fill" style="width:${stepsPct}%;background:${g.color}"></div></div>
+              </div>
+              <div style="font-size:11px;color:var(--warn);font-weight:700;min-width:40px;text-align:right">${p.score||0}pts</div>
+              <button class="kick-btn" onclick="kickFromGroup('${p.id}')">✕</button>
+            </div>`;
+          }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  // live progress table
+  const lpt=document.getElementById('live-progress-table');
+  const hdr=`<div style="display:grid;grid-template-columns:26px 1fr 72px 58px 52px 56px;gap:6px;font-size:10px;color:var(--muted);font-weight:700;padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
+    <div></div><div>Player</div><div>Group</div><div>Steps</div><div>Score</div><div>Status</div></div>`;
+  const rows=alive.map(p=>{
+    const g=GROUPS.find(gg=>gg.id===p.groupId);
+    const complete=g&&(p.stepsCompleted||0)>=g.steps.length;
+    const sc=complete?'var(--ok)':p.groupId?'#0078D4':'var(--muted)';
+    const sl=complete?'Done':p.groupId?'Playing':'Lobby';
+    return `<div style="display:grid;grid-template-columns:26px 1fr 72px 58px 52px 56px;gap:6px;align-items:center;font-size:11px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+      <div style="font-size:16px">${p.avatar}</div>
+      <div style="font-weight:600">${p.name}</div>
+      <div style="color:${g?.color||'var(--muted)'};font-size:10px">${g?g.name:'—'}</div>
+      <div>${g?(p.stepsCompleted||0)+'/'+g.steps.length:'—'}</div>
+      <div style="color:var(--warn);font-weight:700">${p.score||0}</div>
+      <div><span class="pill" style="background:${sc}22;color:${sc};border:1px solid ${sc}44;font-size:9px;padding:2px 7px">${sl}</span></div>
+    </div>`;
+  }).join('');
+  lpt.innerHTML=hdr+rows;
+}
+
+// assign flow
+let assignTargetId=null;
+function openAssign(pid,pname){
+  assignTargetId=pid;
+  document.getElementById('assign-player-name').textContent=`Assigning: ${pname}`;
+  document.getElementById('assign-group-btns').innerHTML=GROUPS.map(g=>`
+    <button onclick="doAssign(${g.id})" style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;background:${g.color}11;border:1.5px solid ${g.color}44;color:var(--text);cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;width:100%"
+      onmouseover="this.style.background='${g.color}22'" onmouseout="this.style.background='${g.color}11'">
+      <span style="font-size:20px">${g.emoji}</span>
+      <div style="text-align:left"><div>${g.name}</div><div style="font-size:10px;color:${g.color};font-weight:500">${g.task}</div></div>
+      <div style="margin-left:auto;font-size:10px;color:var(--muted)">${GROUPS.find(gg=>gg.id===g.id)?'':'—'}</div>
+    </button>`).join('');
+  document.getElementById('assign-modal').classList.add('show');
+}
+
+async function doAssign(gid){
+  if(!assignTargetId)return;
+  const p=await STORE.get(assignTargetId);
+  if(p){
+    p.groupId=gid;
+    await STORE.set(assignTargetId,p);
+  }
+  closeModal();
+  toast(`Player assigned to ${GROUPS.find(g=>g.id===gid)?.name}!`,true);
+  renderAdmin();
+}
+
+async function kickFromGroup(pid){
+  const p=await STORE.get(pid);
+  if(p){p.groupId=null;await STORE.set(pid,p);}
+  renderAdmin();
+}
+
+async function launchGame(){
+  const sess=await getSession()||{};
+  sess.status='active';sess.startedAt=Date.now();sess.timerLeft=TOTAL_SECS;
+  await setSession(sess);
+  document.getElementById('launch-btn').style.display='none';
+  document.getElementById('end-btn').style.display='flex';
+  toast('Game launched! Players are now entering the challenge.',true);
+  // start admin's timer sync
+  startAdminTimerSync();
+}
+
+async function endGame(){
+  const sess=await getSession()||{};
+  sess.status='ended';
+  await setSession(sess);
+  clearInterval(adminPollIv);
+  showResults();
+}
+
+async function startAdminTimerSync(){
+  // admin maintains the shared timer countdown
+  const iv=setInterval(async()=>{
+    const sess=await getSession();
+    if(!sess||sess.status!=='active'){clearInterval(iv);return;}
+    sess.timerLeft=Math.max(0,(sess.timerLeft||TOTAL_SECS)-2);
+    await setSession(sess);
+    if(sess.timerLeft<=0){
+      sess.status='ended';await setSession(sess);clearInterval(iv);
+    }
+  },2000);
+}
+
+// ════════════════════════════════════════════════════════════
+// GAME FLOW  (player side)
+// ════════════════════════════════════════════════════════════
+async function startGame(){
+  // re-fetch my group
+  const me=await STORE.get(myId);
+  if(me)myGroupId=me.groupId;
+
+  const g=GROUPS.find(gg=>gg.id===myGroupId);
+  olState=freshOlState();
+  mySteps={};myScore=0;
+  go('game');
+  buildGameUI();
+  startClientTimer();
+  startGameSync();
+}
+
+function buildGameUI(){
+  const g=GROUPS.find(gg=>gg.id===myGroupId)||GROUPS[0];
+  document.getElementById('g-title-row').innerHTML=`
+    <span style="font-size:22px">${g.emoji}</span>
+    <span style="font-weight:800;font-size:16px">${g.name}</span>
+    <span class="pill" style="background:${g.color}22;color:${g.color};border:1px solid ${g.color}44;font-size:11px">${g.task}</span>`;
+  renderTP();
+  renderOl();
+  renderTeamStrip();
+}
+
+// timer synced from session
+async function startClientTimer(){
+  const sess=await getSession();
+  timerLeft=sess?.timerLeft||TOTAL_SECS;
+  if(timerIv)clearInterval(timerIv);
+  timerIv=setInterval(async()=>{
+    timerLeft=Math.max(0,timerLeft-1);
+    const tv=document.getElementById('timer-val');
+    const tc=document.getElementById('timer-chip');
+    if(tv)tv.textContent=fmtTime(timerLeft);
+    if(tc){
+      if(timerLeft<=60){tc.style.background='var(--err)';}
+      else if(timerLeft<=300){tc.style.background='var(--warn)';}
+      else{tc.style.background='var(--p)';}
+    }
+    if(timerLeft<=0){clearInterval(timerIv);showResults();}
+
+    // resync with session timer every 10s
+    if(timerLeft%10===0){
+      const s=await getSession();
+      if(s?.timerLeft!==undefined)timerLeft=s.timerLeft;
+      if(s?.status==='ended'){clearInterval(timerIv);showResults();}
+    }
+  },1000);
+}
+
+function startGameSync(){
+  if(syncIv)clearInterval(syncIv);
+  syncIv=setInterval(async()=>{
+    await saveMyPlayer();
+    // update team strip from other players
+    renderTeamStrip();
+    const sess=await getSession();
+    if(sess?.status==='ended'){clearInterval(syncIv);clearInterval(timerIv);showResults();}
+  },4000);
+}
+
+// ── TASK PANEL ──
+function renderTP(){
+  const g=GROUPS.find(gg=>gg.id===myGroupId)||GROUPS[0];
+  const done=g.steps.filter(s=>mySteps[s.id]).length;
+  const pct=Math.round(done/g.steps.length*100);
+  document.getElementById('tp').innerHTML=`
+    <div class="tp-title" style="color:${g.color}">📋 Task Panel</div>
+    <div class="tp-desc">${g.desc}</div>
+    <div class="tp-steps">${g.steps.map((step,i)=>{
+      const done2=mySteps[step.id];
+      return `<div class="tp-step" style="background:${done2?'rgba(0,212,170,.07)':g.color+'09'};border-color:${done2?'rgba(0,212,170,.4)':g.color+'22'}" onclick="markStep('${step.id}')">
+        <div class="step-num" style="background:${done2?'var(--ok)':'transparent'};border-color:${done2?'var(--ok)':g.color};color:${done2?'#fff':g.color}">${done2?'✓':i+1}</div>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:600;color:${done2?'var(--muted)':'var(--text)'};text-decoration:${done2?'line-through':'none'}">${step.label}</div>
+          ${!done2?`<div style="font-size:9px;color:var(--muted);margin-top:2px">💡 ${step.hint}</div>`:''}
+        </div>
+      </div>`;
+    }).join('')}</div>
+    <div class="tp-footer">
+      <div class="flex between" style="font-size:10px;margin-bottom:4px">
+        <span style="color:var(--muted)">Progress</span>
+        <span style="color:${g.color};font-weight:700">${done}/${g.steps.length}</span>
+      </div>
+      <div class="pbar-bg" style="height:8px"><div class="pbar-fill" style="width:${pct}%;background:linear-gradient(90deg,${g.color},${g.light})"></div></div>
+      <div style="text-align:right;font-size:9px;color:var(--muted);margin-top:3px">${pct}%</div>
+    </div>`;
+}
+
+async function markStep(sid){
+  if(mySteps[sid])return;
+  mySteps[sid]=true;
+  myScore+=100;
+  document.getElementById('score-val').textContent=myScore;
+  toast('✅ Step done! +100 pts',true);
+  renderTP();
+  await saveMyPlayer();
+  const g=GROUPS.find(gg=>gg.id===myGroupId)||GROUPS[0];
+  if(g.steps.every(s=>mySteps[s.id])){
+    clearInterval(timerIv);clearInterval(syncIv);
+    await saveMyPlayer();
+    setTimeout(()=>{
+      const el=document.getElementById('badge-ov');
+      document.getElementById('b-emoji').textContent=g.badge;
+      document.getElementById('b-group').textContent='Group: '+g.name;
+      document.getElementById('b-score').textContent=myScore+' pts';
+      el.classList.add('show');
+    },300);
+  }
+}
+
+async function renderTeamStrip(){
+  const g=GROUPS.find(gg=>gg.id===myGroupId);
+  if(!g)return;
+  const players=await fetchAllPlayers();
+  const team=players.filter(p=>p.groupId===myGroupId&&Date.now()-p.lastSeen<20000);
+  document.getElementById('team-strip').innerHTML=
+    `<span style="font-size:10px;color:var(--muted)">Team:</span>`+
+    team.map(p=>`<div style="display:flex;align-items:center;gap:5px;background:${g.color}11;border:1px solid ${g.color}33;border-radius:20px;padding:3px 9px 3px 5px;font-size:10px">
+      <span style="font-size:14px">${p.avatar}</span>
+      ${p.name.split(' ')[0]}
+      <span style="color:var(--muted)">${p.stepsCompleted||0}/${g.steps.length}</span>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+// OUTLOOK SIMULATION
+// ════════════════════════════════════════════════════════════
+function renderOl(){
+  const g=GROUPS.find(gg=>gg.id===myGroupId)||GROUPS[0];
+  const o=olState;
+  const tBtn=(lbl,key,act)=>`<button class="ol-t${o.tab===key?' on':''}" onclick="olTab('${key}'${act?',true':''})">${lbl}</button>`;
+  const rBtn=(lbl,fn,hl)=>`<button class="ol-rb${hl?' hl':''}" onclick="${fn}">${lbl}</button>`;
+
+  let rib='';
+  if(o.tab==='home') rib=rBtn('✉ New Email','olCompose()',g.id===1||g.id===4)+rBtn('📬 Reply','',false)+rBtn('🗑 Delete','',false);
+  else if(o.tab==='sendreceive') rib=rBtn('⟳ Send/Receive All','olSync()',g.id===2)+rBtn('⟳ Update Folder','olUpdateFolder()',g.id===2)+rBtn('⏸ Stop','',false);
+  else if(o.tab==='view') rib=rBtn('📋 Reading Pane','',false);
+  else if(o.tab==='file') rib=rBtn('⚙️ Options','olOptions()',g.id===3);
+
+  const sb=`
+    <div class="ol-fi${!o.calView?' on':''}" onclick="olGoMail()">📥 Inbox</div>
+    <div class="ol-fi" onclick="olGoMail()">📤 Sent</div>
+    <div class="ol-fi">📁 Drafts</div>
+    <div class="ol-fi">🗑 Deleted</div>
+    ${o.folders.map(f=>`<div class="ol-fi" style="padding-left:18px;color:#0078D4">📁 ${f}</div>`).join('')}
+    <div class="ol-fi" style="color:#0078D4${g.id===4?';font-weight:700':''}" onclick="olNewFolder()">⊕ New Folder${g.id===4?' ←':''}</div>
+    <div class="ol-fi" style="color:#8764B8;border-top:1px solid #d2d0ce;margin-top:5px;padding-top:6px" onclick="olCalendar()">📅 Calendar</div>`;
+
+  let main='';
+  if(o.syncing){
+    main=`<div class="sync-ov"><span style="font-size:28px;animation:spin 1s linear infinite;display:block">⟳</span>
+      <div style="font-size:12px;color:#444;font-weight:600">Syncing all folders…</div>
+      <div style="width:180px;height:7px;background:#edebe9;border-radius:4px;overflow:hidden"><div style="height:100%;background:#0078D4;border-radius:4px;animation:grow 2.4s ease forwards"></div></div>
+      <div style="font-size:10px;color:#888">Connecting to Exchange server…</div></div>`;
+  } else if(o.syncDone&&g.id===2){
+    main=`<div style="background:#dff6dd;border:1px solid #107c10;border-radius:5px;padding:10px;font-size:11px;color:#107c10;margin-bottom:8px">✅ Sync complete! 2 new messages. 💡 Press F9 anytime.</div>
+      <div class="inbox-row unread">IT Department — Welcome to Outlook (NEW)</div>
+      <div class="inbox-row unread">Manager — Q3 Team Update (NEW)</div>
+      <div class="inbox-row">Training Team — Orientation Schedule</div>`;
+  } else if(o.compose){
+    main=`<div style="background:#fff;border:1px solid #d2d0ce;border-radius:5px;padding:10px;display:flex;flex-direction:column;gap:6px">
+      <div style="font-weight:700;font-size:12px;color:#0078D4;margin-bottom:2px">✉ New Message</div>
+      <div class="c-row"><span class="c-lbl">To:</span><input class="ol-inp" value="${o.toVal}" placeholder="recipient@example.com" oninput="olToInput(this.value)"></div>
+      <div class="c-row"><span class="c-lbl">Cc:</span><input class="ol-inp" value="${o.ccVal}" placeholder="cc@example.com" oninput="olCcInput(this.value)"></div>
+      ${(o.showBcc||g.id===4)?`<div class="c-row"><span class="c-lbl" style="color:#8764B8">Bcc:</span><input class="ol-inp" style="border-color:#8764B8" value="${o.bccVal}" placeholder="hidden@example.com" oninput="olBccInput(this.value)"></div>`:''}
+      ${(g.id===4&&!o.showBcc)?`<button class="ol-bs" style="align-self:flex-start;color:#8764B8;border-color:#8764B8" onclick="olShowBcc()">+ Show Bcc field</button>`:''}
+      <div class="c-row"><span class="c-lbl">Sub:</span><input class="ol-inp" value="${o.subVal}" placeholder="Subject line" oninput="olSubInput(this.value)"></div>
+      <textarea class="ol-inp" style="min-height:70px;resize:none" placeholder="Write your message here…" oninput="olBodyInput(this.value)">${o.bodyVal}</textarea>
+      <div style="display:flex;gap:6px;margin-top:2px">
+        <button class="ol-bb" onclick="olSend()">📤 Send</button>
+        <button class="ol-bs" onclick="olState.compose=false;renderOl()">Discard</button>
+      </div></div>`;
+  } else if(o.calView&&!o.meetingForm){
+    const cells=Array.from({length:31},(_,i)=>`<div style="text-align:center;padding:3px;font-size:10px;cursor:pointer;border-radius:3px;${i===9?'background:#deecf9;color:#0078D4;font-weight:700':'color:#444'}" onclick="olNewMeeting()">${i+1}</div>`).join('');
+    main=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-weight:700;font-size:12px">July 2026</div>
+      <button class="ol-bs" style="color:#0078D4;border-color:#0078D4;animation:olpulse 1.5s infinite" onclick="olNewMeeting()">+ New Appointment</button></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">
+      ${['Mo','Tu','We','Th','Fr','Sa','Su'].map(d=>`<div style="text-align:center;font-size:9px;color:#888;padding:2px">${d}</div>`).join('')}${cells}</div>`;
+  } else if(o.meetingForm){
+    main=`<div style="display:flex;flex-direction:column;gap:7px">
+      <div style="font-weight:700;font-size:12px;color:#0078D4">New Meeting</div>
+      <div class="c-row"><span class="c-lbl">Title:</span><input class="ol-inp" value="${o.meetTitle}" placeholder="Meeting title" oninput="olMeetTitle(this.value)"></div>
+      <div class="c-row"><span class="c-lbl">Attendees:</span><input class="ol-inp" placeholder="Add attendees" oninput="olMeetAttend()"></div>
+      <div class="c-row"><span class="c-lbl">Time:</span><input type="datetime-local" class="ol-inp"></div>
+      ${!o.meetTeams?`<button class="ol-bs" style="align-self:flex-start;color:#6264A7;border-color:#6264A7;animation:olpulse 1.5s infinite" onclick="olAddTeams()">📹 Add Teams Meeting</button>`
+        :`<div style="background:#deecf9;border:1px solid #0078D4;border-radius:4px;padding:8px;font-size:10px;color:#0078D4">📹 Teams meeting added ✓</div>`}
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button class="ol-bb" onclick="olSendMeeting()">Send Invites</button>
+        <button class="ol-bs" onclick="olState.meetingForm=false;renderOl()">Cancel</button>
+      </div></div>`;
+  } else if(o.mailOpts){
+    main=`<div style="display:flex;flex-direction:column;gap:9px">
+      <div style="font-weight:700;font-size:13px">Outlook Options — Mail</div>
+      <div style="font-size:10px;color:#666">Compose messages, tracking, and signatures.</div>
+      <div style="border-top:1px solid #edebe9;padding-top:8px">
+        <div style="font-size:11px;font-weight:700;margin-bottom:4px;color:#323130">Signatures</div>
+        <div style="font-size:10px;color:#888;margin-bottom:8px">Create or modify email signatures.</div>
+        <button class="ol-bs" style="color:#0078D4;border-color:#0078D4;font-weight:700;animation:olpulse 1.5s infinite" onclick="olSigDialog()">✏️ Signatures…</button>
+      </div>
+      <button class="ol-bs" style="align-self:flex-end" onclick="olState.mailOpts=false;renderOl()">Close</button></div>`;
+  } else if(o.sigDialog){
+    main=o.sigSaved
+      ?`<div style="text-align:center;padding:16px"><div style="font-size:22px;margin-bottom:6px">✅</div>
+          <div style="font-weight:700;color:#107c10;font-size:13px">Signature saved!</div>
+          <div style="font-size:10px;color:#666;margin-top:4px">"${o.sigName}" applied to new messages.</div>
+          <button class="ol-bb" style="margin-top:10px" onclick="olState.sigDialog=false;renderOl()">Done</button></div>`
+      :`<div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-weight:700;font-size:13px">Signatures and Stationery</div>
+          <input class="ol-inp" placeholder="Signature name" value="${o.sigName}" oninput="olSigName(this.value)">
+          <textarea class="ol-inp" style="min-height:60px;resize:none" placeholder="Name | Title | Company | Phone" oninput="olSigText(this.value)">${o.sigText}</textarea>
+          <div style="font-size:10px;color:#444">New messages: <select style="font-size:10px;border:1px solid #d2d0ce;padding:2px 6px;border-radius:3px" onchange="olSigAssign()"><option>(none)</option>${o.sigName?`<option>${o.sigName}</option>`:''}</select></div>
+          <div style="display:flex;gap:6px"><button class="ol-bb" onclick="olSaveSig()">Save Signature</button><button class="ol-bs" onclick="olState.sigDialog=false;renderOl()">Cancel</button></div></div>`;
+  } else if(o.newFolder){
+    main=`<div style="background:#fff;border:1px solid #d2d0ce;border-radius:5px;padding:10px;display:flex;flex-direction:column;gap:7px">
+      <div style="font-weight:700;font-size:12px">Create New Folder</div>
+      <input class="ol-inp" id="fnm" placeholder="Folder name">
+      <div style="display:flex;gap:6px"><button class="ol-bb" onclick="olCreateFolder()">Create</button><button class="ol-bs" onclick="olState.newFolder=false;renderOl()">Cancel</button></div></div>`;
+  } else {
+    const hints={1:'Click New Email to compose your message.',2:'Click the Send/Receive tab to sync.',3:'Click File → Options → Mail → Signatures.',4:'Click New Email, show Bcc, then create a folder.',5:'Click Calendar in the sidebar.'};
+    main=`<div style="font-size:10px;color:#888;margin-bottom:7px;font-style:italic">📧 ${hints[g.id]||''}</div>
+      <div class="inbox-row unread">IT Department — Welcome to Outlook</div>
+      <div class="inbox-row unread">Manager — Set up your email signature</div>
+      <div class="inbox-row">Training Team — Orientation schedule</div>`;
+  }
+
+  document.getElementById('ol-win').innerHTML=`
+    <div class="ol-tb"><span style="font-size:16px">✉</span><span style="font-weight:700">Outlook</span>
+      <span style="font-size:10px;opacity:.75">— User1@contoso.com</span>
+      <div style="margin-left:auto;display:flex;gap:4px"><button class="ol-wb">─</button><button class="ol-wb">□</button><button class="ol-wb">✕</button></div></div>
+    <div class="ol-tabs">${tBtn('Home','home')}${tBtn('Send/Receive','sendreceive',true)}${tBtn('View','view')}${tBtn('File','file',true)}</div>
+    <div class="ol-rib">${rib}</div>
+    <div class="ol-body"><div class="ol-sb">${sb}</div><div class="ol-main">${main}</div></div>`;
+}
+
+// Outlook handlers
+function olTab(key,act){olState.tab=key;if(key==='sendreceive'&&myGroupId===2)markStep('s1');if(key==='file'&&myGroupId===3)markStep('s1');renderOl();}
+function olCompose(){olState.compose=true;olState.calView=false;olState.newFolder=false;if(myGroupId===1)markStep('s1');if(myGroupId===4)markStep('s1');renderOl();}
+function olToInput(v){olState.toVal=v;if(v.includes('@')&&myGroupId===1)markStep('s2');if(v.includes('@')&&myGroupId===4)markStep('s1');}
+function olCcInput(v){olState.ccVal=v;if(v.includes('@')&&myGroupId===1)markStep('s3');}
+function olBccInput(v){olState.bccVal=v;if(v.includes('@')&&myGroupId===4)markStep('s3');}
+function olSubInput(v){olState.subVal=v;if(v.length>3&&myGroupId===1)markStep('s4');}
+function olBodyInput(v){olState.bodyVal=v;if(v.length>20&&myGroupId===1)markStep('s5');}
+function olShowBcc(){olState.showBcc=true;if(myGroupId===4)markStep('s2');renderOl();}
+function olSend(){
+  if(!olState.toVal.includes('@')||!olState.subVal||!olState.bodyVal){toast('Fill in To, Subject and Body first!',false);return;}
+  olState.compose=false;if(myGroupId===1)markStep('s6');if(myGroupId===4)markStep('s4');renderOl();
+}
+function olSync(){if(myGroupId===2)markStep('s2');olState.syncing=true;renderOl();setTimeout(()=>{olState.syncing=false;olState.syncDone=true;if(myGroupId===2){markStep('s3');markStep('s4');}renderOl();},2400);}
+function olUpdateFolder(){if(myGroupId===2)markStep('s5');}
+function olCalendar(){olState.calView=true;olState.compose=false;if(myGroupId===5)markStep('s1');renderOl();}
+function olGoMail(){olState.calView=false;olState.meetingForm=false;renderOl();}
+function olNewMeeting(){olState.meetingForm=true;if(myGroupId===5)markStep('s2');renderOl();}
+function olMeetTitle(v){olState.meetTitle=v;if(v.length>2&&myGroupId===5)markStep('s3');}
+function olMeetAttend(){if(myGroupId===5)markStep('s4');}
+function olAddTeams(){olState.meetTeams=true;if(myGroupId===5)markStep('s5');renderOl();}
+function olSendMeeting(){if(myGroupId===5)markStep('s6');olState.meetingForm=false;renderOl();}
+function olNewFolder(){olState.newFolder=true;if(myGroupId===4)markStep('s5');renderOl();}
+function olCreateFolder(){const inp=document.getElementById('fnm');if(!inp||!inp.value.trim())return;olState.folders.push(inp.value.trim());olState.newFolder=false;if(myGroupId===4)markStep('s6');renderOl();}
+function olOptions(){olState.mailOpts=true;if(myGroupId===3)markStep('s2');renderOl();}
+function olSigDialog(){olState.sigDialog=true;olState.mailOpts=false;if(myGroupId===3)markStep('s3');renderOl();}
+function olSigName(v){olState.sigName=v;}
+function olSigText(v){olState.sigText=v;}
+function olSigAssign(){if(myGroupId===3)markStep('s6');}
+function olSaveSig(){
+  if(!olState.sigName||!olState.sigText){toast('Enter a name and text!',false);return;}
+  olState.sigSaved=true;if(myGroupId===3){markStep('s4');markStep('s5');markStep('s7');}renderOl();
+}
+
+// ════════════════════════════════════════════════════════════
+// RESULTS
+// ════════════════════════════════════════════════════════════
+async function showResults(){
+  if(timerIv)clearInterval(timerIv);
+  if(syncIv)clearInterval(syncIv);
+  if(pollIv)clearInterval(pollIv);
+  go('results');
+  await renderResults();
+}
+
+async function renderResults(){
+  const g=GROUPS.find(gg=>gg.id===myGroupId);
+  const done=g?g.steps.filter(s=>mySteps[s.id]).length:0;
+  const total=g?g.steps.length:0;
+  const mrc=document.getElementById('my-result');
+  mrc.innerHTML=g?`
+    <div style="font-size:11px;color:var(--muted);margin-bottom:5px">Your final score</div>
+    <div style="font-size:42px;font-weight:900;color:var(--warn)">${myScore}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">${g.name} · ${done}/${total} tasks</div>
+    <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+      ${done===total?`<span class="pill" style="background:rgba(0,212,170,.15);color:var(--ok);border:1px solid rgba(0,212,170,.3)">🎖 All done</span>`:''}
+      ${done>0?`<span class="pill" style="background:var(--pg);color:var(--p);border:1px solid rgba(161,0,255,.3)">⭐ Participated</span>`:''}
+    </div>`:
+    `<div style="font-size:13px;color:var(--muted)">Game over!</div>`;
+
+  const players=await fetchAllPlayers();
+  const ranked=GROUPS.map(gg=>({
+    ...gg,
+    score:players.filter(p=>p.groupId===gg.id).reduce((a,p)=>a+(p.score||0),0),
+    members:players.filter(p=>p.groupId===gg.id).length
+  })).sort((a,b)=>b.score-a.score);
+  const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
+  document.getElementById('lb').innerHTML=ranked.map((gg,i)=>`
+    <div class="lb-row${i===0?' gold':''}">
+      <div style="font-size:22px;min-width:30px;text-align:center">${medals[i]}</div>
+      <div style="font-size:18px">${gg.emoji}</div>
+      <div style="flex:1"><div style="font-weight:700;font-size:13px">${gg.name}</div><div style="font-size:10px;color:${gg.color}">${gg.task}</div></div>
+      <div style="text-align:right">
+        <div style="font-size:22px;font-weight:900;color:${i===0?'var(--warn)':'var(--text)'}">${gg.score}</div>
+        <div style="font-size:9px;color:var(--muted)">${gg.members} player${gg.members!==1?'s':''}</div>
+      </div>
+    </div>`).join('');
+}
+
+function resetPlayer(){
+  myId=null;myName=null;myAvatar=AVATARS[0];myGroupId=null;myScore=0;mySteps={};
+  olState=freshOlState();chosenAvIdx=0;buildAvatarPicker();
+  document.getElementById('name-inp').value='';
+}
+
+// ════════════════════════════════════════════════════════════
+// STORAGE FALLBACK  (if window.storage not available — local)
+// ════════════════════════════════════════════════════════════
+if(!window.storage){
+  // polyfill with in-memory storage so the app still works
+  const _mem={};
+  window.storage={
+    get:async(k)=>_mem[k]?{key:k,value:_mem[k]}:null,
+    set:async(k,v)=>{_mem[k]=v;return{key:k,value:v};},
+    delete:async(k)=>{delete _mem[k];return{key:k,deleted:true};},
+    list:async(pfx)=>({keys:Object.keys(_mem).filter(k=>k.startsWith(pfx))})
+  };
+  // show a notice that multiplayer needs the Claude artifact environment
+  const notice=document.createElement('div');
+  notice.style.cssText='position:fixed;top:0;left:0;right:0;background:#ffb800;color:#000;font-size:12px;font-weight:700;padding:8px 16px;text-align:center;z-index:99999';
+  notice.textContent='ℹ️ Running in standalone mode — multiplayer sync requires the Claude artifact environment. All features work locally.';
+  document.body.prepend(notice);
+}
+</script>
+</body>
 </html>
